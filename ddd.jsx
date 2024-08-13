@@ -61,24 +61,39 @@ function main(compWidth, compHeight, compFrameRate) {
         frameRate=compFrameRate
     );
     
-    function importFootage(filename) {
+    function importFootage(edlClip) {
         var footageItem;
-        // This doesn't work atm
+        // This doesn't work atm, but has to be fixed. Each clip is imported as a new item
         // for (var j = 1; j <= app.project.numItems; j++) {
-        //     if (app.project.item(j).name === filename) {
+        //     if (app.project.item(j).name === edlClip.FileName) {
         //         footageItem = app.project.item(j);
         //         break;
         //     }
         // }
         if (!footageItem) {
-            footageItem = app.project.importFile(new ImportOptions(File(clip.FileName)));
+            try {
+                footageItem = app.project.importFile(
+                    new ImportOptions(File(edlClip.FileName))
+                );
+            }
+            catch (e) {
+                // TODO: Defer the alert & list all missing files
+                alert('Failed to import file: ' + edlClip.FileName);
+                footageItem = app.project.importPlaceholder(
+                    edlClip.FileName,
+                    compWidth,
+                    compHeight,
+                    compFrameRate,
+                    edlClip.StreamLength / 1000
+                )
+            }
         }
         return footageItem;
     }
     
     for (var clipIndex = 0; clipIndex < edl.length; clipIndex++) {
         var clip = edl[clipIndex];
-        var footageItem = importFootage(clip.FileName);
+        var footageItem = importFootage(clip);
         var layer = comp.layers.add(footageItem);
     
         // Timeline position
@@ -140,24 +155,27 @@ function drawPanel(rootPanel) {
     grpCompRes.orientation = 'row';
     
     lblCompWidth = grpCompRes.add('statictext', undefined, 'Width:'); 
-    txtCompWidth = grpCompRes.add('edittext', undefined, '1920').characters = 4; 
+    txtCompWidth = grpCompRes.add('edittext', undefined, '1920')
+    txtCompWidth.characters = 4; 
     
     lblCompHeight = grpCompRes.add('statictext', undefined, 'Height:'); 
-    txtCompHeight = grpCompRes.add('edittext', undefined, '1080').characters = 4; 
+    txtCompHeight = grpCompRes.add('edittext', undefined, '1080')
+    txtCompHeight.characters = 4; 
     
     var grpOther = panel.add('group');
     grpOther.orientation = 'row';
     lblCompFrameRate = grpOther.add('statictext', undefined, 'Frame Rate:'); 
-    txtCompFrameRate = grpOther.add('edittext', undefined, '24').characters = 2;
+    txtCompFrameRate = grpOther.add('edittext', undefined, '24')
+    txtCompFrameRate.characters = 2;
     
     panel.add('button', undefined, 'Import EDL...').onClick = function() { 
         var compWidth = parseInt(txtCompWidth.text);
         var compHeight = parseInt(txtCompHeight.text);
         var compFrameRate = parseInt(txtCompFrameRate.text);
         main(compWidth, compHeight, compFrameRate);
-        panel.close(); // If running standalone
+        panel.close(); // If running undocked
     };
-
+    
     return panel;
 }
 
@@ -169,11 +187,11 @@ panel.onResizing = panel.onResize = function() {
 };
 
 if (panel instanceof Window) {
-    // Running standalone
+    // Running undocked
     panel.center();
     panel.show();
 } else {
-    // Running as a SciptUI panel
+    // Running as a docked panel
     panel.layout.layout(true);
     panel.layout.resize();
 }
