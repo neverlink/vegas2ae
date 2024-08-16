@@ -61,38 +61,52 @@ function main(compWidth, compHeight, compFrameRate) {
         frameRate=compFrameRate
     );
     
+    var failedImports = {};
+    var ignoreFailedImports = false;
     function importFootage(edlClip) {
+        var clipFile = File(edlClip.FileName);
         var footageItem;
-        // This doesn't work atm, but has to be fixed. Each clip is imported as a new item
-        // for (var j = 1; j <= app.project.numItems; j++) {
-        //     if (app.project.item(j).name === edlClip.FileName) {
-        //         footageItem = app.project.item(j);
-        //         break;
-        //     }
-        // }
-        if (!footageItem) {
-            try {
-                footageItem = app.project.importFile(
-                    new ImportOptions(File(edlClip.FileName))
-                );
-            }
-            catch (e) {
-                // TODO: Defer the alert & list all missing files
-                alert('Failed to import file: ' + edlClip.FileName);
-                footageItem = app.project.importPlaceholder(
-                    edlClip.FileName,
-                    compWidth,
-                    compHeight,
-                    compFrameRate,
-                    edlClip.StreamLength / 1000
-                )
+
+        // Check if same file is already imported
+        for (var j = 1; j <= app.project.numItems; j++) {
+            var projectItem = app.project.items[j];
+
+            if (!clipFile)
+                failedImports[edlClip.FileName] = true;
+            else if (
+                !(projectItem instanceof FootageItem) ||
+                projectItem.mainSource instanceof PlaceholderSource
+            ) continue;
+
+            if (projectItem.file.fullName === clipFile.fullName) {
+                footageItem = projectItem;
+                break;
             }
         }
-        return footageItem;
+
+        if (footageItem)
+            return app.project.importFile(new ImportOptions(clipFile));
+
+        if (!ignoreFailedImports)
+            ignoreFailedImports = Window.confirm(
+                'Failed to import file:\n' + edlClip.FileName +
+                '\n A placeholder will be used instead.' +
+                '\n\n Do you want to disable this warning?'
+            );
+        
+        return app.project.importPlaceholder(
+            edlClip.FileName,
+            compWidth,
+            compHeight,
+            compFrameRate,
+            edlClip.StreamLength / 1000
+        )
     }
     
     for (var clipIndex = 0; clipIndex < edl.length; clipIndex++) {
         var clip = edl[clipIndex];
+        if (failedImports[clip.FileName])
+            continue;
         var footageItem = importFootage(clip);
         var layer = comp.layers.add(footageItem);
     
@@ -130,7 +144,7 @@ function main(compWidth, compHeight, compFrameRate) {
             layer.audioEnabled = false; // Disables audio
             applyFades(layer['opacity']);
         } else {
-            throw new Error('Media type not supported: ' + clip.MediaType); 
+            alert('Media type not supported: ' + clip.MediaType); 
         }
     
         // TODO: Fix comp duration (exess end time)
@@ -191,7 +205,7 @@ if (panel instanceof Window) {
     panel.center();
     panel.show();
 } else {
-    // Running as a docked panel
+    // Running as a panel
     panel.layout.layout(true);
     panel.layout.resize();
 }
@@ -200,9 +214,5 @@ if (panel instanceof Window) {
 // might want to sort the layers by start time
 // in order to preserve the logical order of clips
 // rainbow color layers like in fl?
-// handle missing items
 // reverse layer order option
 // applyPreset to every clip?
-
-// // Set the final duration of the composition
-// compDuration = Math.max(compDuration, startTime + length);
