@@ -73,11 +73,10 @@ function main(compWidth, compHeight, compFrameRate) {
 
             if (!clipFile)
                 failedImports[edlClip.FileName] = true;
-            else if (
-                !(projectItem instanceof FootageItem) ||
-                projectItem.mainSource instanceof PlaceholderSource
-            ) continue;
-
+                continue;
+            else if (!(projectItem instanceof FootageItem) || projectItem.mainSource instanceof PlaceholderSource)
+                continue;
+            
             if (projectItem.file.fullName === clipFile.fullName) {
                 footageItem = projectItem;
                 break;
