@@ -7,7 +7,7 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
     }
     
     function parseEDL(edlFile) {
-        edlFile.open("r");
+        edlFile.open('r');
         var lines = edlFile.read().split("\n");
         edlFile.close();
     
@@ -72,6 +72,7 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
 
         // Check if same file is already imported
         // TODO: Why loop from 1?
+        // TODO: Take fn out as findFootageItem(app.project, clipFile)
         for (var j = 1; j <= app.project.numItems; j++) {
             var projectItem = app.project.items[j];
 
@@ -162,15 +163,12 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
 }
 
 function drawPanel(rootPanel) {
-    var title = 'Vegas EDL Import';
     var panel = (rootPanel instanceof Panel)
         ? rootPanel
-        : new Window('palette', title, undefined);
+        : new Window('palette', 'Vegas EDL Import', undefined);
 
-    panel.text = title;
-    
     // Composition settings
-    subpanelComp = panel.add("panel", undefined, "Composition");
+    subpanelComp = panel.add('panel', undefined, 'Composition');  
 
     var grpComp = subpanelComp.add('group');
     grpComp.orientation = 'row';
@@ -199,16 +197,11 @@ function drawPanel(rootPanel) {
         main(compWidth, compHeight, compFrameRate, chkReverseLayerOrder.value);
         panel.close(); // If running undocked
     };
-    
+
     return panel;
 }
 
 var panel = drawPanel(this);
-
-// Necessary? Also, this can be moved outside
-panel.onResizing = panel.onResize = function() {
-    this.layout.resize();
-};
 
 if (panel instanceof Window) {
     // Running undocked
