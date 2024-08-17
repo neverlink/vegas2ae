@@ -1,4 +1,4 @@
-function main(compWidth, compHeight, compFrameRate) {
+function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
     var edlFile;
     edlFile = File.openDialog('Select an EDL file');
     if (!edlFile) {
@@ -51,6 +51,9 @@ function main(compWidth, compHeight, compFrameRate) {
     var compName = edlFile.name.split('.txt')[0]; 
     var edl = parseEDL(edlFile);
 
+    if (reverseLayerOrder)
+        edl.reverse();
+
     var compBaseDuration = 1; // Subtracted later // Default for now, must be calculated
     var comp = app.project.items.addComp(
         name=compName,
@@ -68,14 +71,16 @@ function main(compWidth, compHeight, compFrameRate) {
         var footageItem;
 
         // Check if same file is already imported
+        // TODO: Why loop from 1?
         for (var j = 1; j <= app.project.numItems; j++) {
             var projectItem = app.project.items[j];
 
-            if (!clipFile)
+            if (!clipFile) {
                 failedImports[edlClip.FileName] = true;
                 continue;
-            else if (!(projectItem instanceof FootageItem) || projectItem.mainSource instanceof PlaceholderSource)
+            } else if (!(projectItem instanceof FootageItem) || projectItem.mainSource instanceof PlaceholderSource) {
                 continue;
+            }
             
             if (projectItem.file.fullName === clipFile.fullName) {
                 footageItem = projectItem;
@@ -89,8 +94,8 @@ function main(compWidth, compHeight, compFrameRate) {
         if (!ignoreFailedImports)
             ignoreFailedImports = Window.confirm(
                 'Failed to import file:\n' + edlClip.FileName +
-                '\n A placeholder will be used instead.' +
-                '\n\n Do you want to disable this warning?'
+                '\nA placeholder will be used instead.' +
+                '\n\nDo you want to disable this warning?'
             );
         
         return app.project.importPlaceholder(
@@ -164,28 +169,34 @@ function drawPanel(rootPanel) {
 
     panel.text = title;
     
-    var grpCompRes = panel.add('group');
-    grpCompRes.orientation = 'row';
+    // Composition settings
+    subpanelComp = panel.add("panel", undefined, "Composition");
+
+    var grpComp = subpanelComp.add('group');
+    grpComp.orientation = 'row';
     
-    lblCompWidth = grpCompRes.add('statictext', undefined, 'Width:'); 
-    txtCompWidth = grpCompRes.add('edittext', undefined, '1920')
+    grpComp.add('statictext', undefined, 'Width:'); 
+    txtCompWidth = grpComp.add('edittext', undefined, '1920');
     txtCompWidth.characters = 4; 
     
-    lblCompHeight = grpCompRes.add('statictext', undefined, 'Height:'); 
-    txtCompHeight = grpCompRes.add('edittext', undefined, '1080')
+    grpComp.add('statictext', undefined, 'Height:'); 
+    txtCompHeight = grpComp.add('edittext', undefined, '1080');
     txtCompHeight.characters = 4; 
     
-    var grpOther = panel.add('group');
-    grpOther.orientation = 'row';
-    lblCompFrameRate = grpOther.add('statictext', undefined, 'Frame Rate:'); 
-    txtCompFrameRate = grpOther.add('edittext', undefined, '24')
+    grpComp.add('statictext', undefined, 'Frame Rate:'); 
+    txtCompFrameRate = grpComp.add('edittext', undefined, '24');
     txtCompFrameRate.characters = 2;
+
+    // Import options
+    var grpOptions = panel.add('group');
+    grpOptions.orientation = 'row';
+    var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order?');
     
     panel.add('button', undefined, 'Import EDL...').onClick = function() { 
         var compWidth = parseInt(txtCompWidth.text);
         var compHeight = parseInt(txtCompHeight.text);
         var compFrameRate = parseInt(txtCompFrameRate.text);
-        main(compWidth, compHeight, compFrameRate);
+        main(compWidth, compHeight, compFrameRate, chkReverseLayerOrder.value);
         panel.close(); // If running undocked
     };
     
@@ -210,8 +221,5 @@ if (panel instanceof Window) {
 }
 
 // rename/recolor repeating datasources where one is audio, other is video
-// might want to sort the layers by start time
-// in order to preserve the logical order of clips
 // rainbow color layers like in fl?
-// reverse layer order option
 // applyPreset to every clip?
