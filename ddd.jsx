@@ -1,4 +1,4 @@
-function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
+function main(options) {
     var edlFile;
     edlFile = File.openDialog('Select an EDL file');
     if (!edlFile) {
@@ -8,7 +8,7 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
     
     function parseEDL(edlFile) {
         edlFile.open('r');
-        var lines = edlFile.read().split("\n");
+        var lines = edlFile.read().split('\n');
         edlFile.close();
     
         // Remove last row (expected to be blank)
@@ -48,66 +48,84 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
         return edl;
     }
     
-    var compName = edlFile.name.split('.txt')[0]; 
     var edl = parseEDL(edlFile);
-
-    if (reverseLayerOrder)
+    if (options['reverseLayerOrder'])
         edl.reverse();
 
     var compBaseDuration = 1; // Subtracted later // Default for now, must be calculated
     var comp = app.project.items.addComp(
-        name=compName,
-        width=compWidth,
-        height=compHeight,
-        pixelAspect=1,
-        duration=compBaseDuration,
-        frameRate=compFrameRate
+        edlFile.name.split('.txt')[0],
+        options.compWidth,
+        options.compHeight,
+        options.compPixelAspect,
+        compBaseDuration,
+        options.compFrameRate
     );
     
     var failedImports = {};
     var ignoreFailedImports = false;
-    function importFootage(edlClip) {
-        var clipFile = File(edlClip.FileName);
-        var footageItem;
 
-        // Check if same file is already imported
+    function findFootageItem(edlClip, clipFile) {
         // TODO: Why loop from 1?
-        // TODO: Take fn out as findFootageItem(app.project, clipFile)
         for (var j = 1; j <= app.project.numItems; j++) {
             var projectItem = app.project.items[j];
 
-            if (!clipFile) {
-                failedImports[edlClip.FileName] = true;
-                continue;
-            } else if (!(projectItem instanceof FootageItem) || projectItem.mainSource instanceof PlaceholderSource) {
-                continue;
-            }
-            
-            if (projectItem.file.fullName === clipFile.fullName) {
-                footageItem = projectItem;
-                break;
-            }
+            // Solids have no FileName
+            if (!edlClip.FileName && projectItem instanceof SolidSource)
+                return projectItem;
+            else if (projectItem.file && projectItem.file.fullName === clipFile.fullName)
+                return projectItem;
+            else continue;
         }
+    }
 
-        if (footageItem)
-            return app.project.importFile(new ImportOptions(clipFile));
-
-        if (!ignoreFailedImports)
-            ignoreFailedImports = Window.confirm(
-                'Failed to import file:\n' + edlClip.FileName +
-                '\nA placeholder will be used instead.' +
-                '\n\nDo you want to disable this warning?'
-            );
-        
+    function getPlaceholder(edlClip) {
         return app.project.importPlaceholder(
             edlClip.FileName,
-            compWidth,
-            compHeight,
-            compFrameRate,
+            options['compWidth'],
+            options['compHeight'],
+            options['compFrameRate'],
             edlClip.StreamLength / 1000
         )
     }
-    
+
+    function getSolid(edlClip) {
+        edlClip.FileName = 'Solid';
+        var footageItem = getPlaceholder(edlClip);
+        footageItem.replaceWithSolid(
+            [0.33, 0.22, 0.77],
+            'Solid',
+            options['compWidth'],
+            options['compHeight'],
+            options['compPixelAspect']
+        );
+        return footageItem;
+    }
+
+    function importFootage(edlClip) {
+        var clipFile = File(edlClip.FileName);
+        var footageItem = findFootageItem(edlClip, clipFile);
+
+        if (footageItem)
+            return footageItem;
+
+        // Don't show this warning for Solids
+        if (!ignoreFailedImports && edlClip.FileName) {
+            ignoreFailedImports = Window.confirm(
+                'Failed to import file:\n' + edlClip.FileName +
+                '\nA placeholder will be used instead.' +
+                '\n\nPress OK to suppress this warning.'
+            );
+        }
+
+        if (!edlClip.FileName)
+            return getSolid(edlClip);
+        else if (clipFile.exists)
+            return app.project.importFile(new ImportOptions(clipFile));
+        else
+            return getPlaceholder(edlClip);
+    }
+
     for (var clipIndex = 0; clipIndex < edl.length; clipIndex++) {
         var clip = edl[clipIndex];
         if (failedImports[clip.FileName])
@@ -125,17 +143,43 @@ function main(compWidth, compHeight, compFrameRate, reverseLayerOrder) {
     
         layer.stretch = clip.PlayRate * 100;
     
-        function applyFades(handle) {
+        function applyFades(propHandle) {
             var minValue = 0;
             var maxValue = 100;
     
             if (clip.FadeTimeIn > 0) {
-                handle.setValueAtTime(layer.inPoint, minValue); 
-                handle.setValueAtTime(layer.inPoint + (clip.FadeTimeIn / 1000), maxValue);
+                propHandle.setValueAtTime(layer.inPoint, minValue); 
+                propHandle.setValueAtTime(layer.inPoint + (clip.FadeTimeIn / 1000), maxValue);
+
+                if (clip.CurveIn == 1) {
+                    // Linear
+                    alert('CurveIn: 1 (Linear)');
+                    // return;
+                } else if (clip.CurveIn == 4) {
+                    // Easy Ease
+                    alert('CurveIn: 4 (Easy Ease)');
+                    var easyEase = new KeyframeEase(0, 33.33);
+                    propHandle.setTemporalEaseAtKey(1, [easyEase]);
+                    propHandle.setTemporalEaseAtKey(2, [easyEase]);
+                } else if (clip.CurveIn == 2) {
+                    alert('CurveIn: 2 (Fast in Slow out)');
+                    var easeIn = new KeyframeEase(0, 0.1);
+                    var easeOut = new KeyframeEase(0, 75);
+                    propHandle.setTemporalEaseAtKey(1, [easeIn]);
+                    propHandle.setTemporalEaseAtKey(2, [easeOut]);
+                } else if (clip.CurveIn == -2) {
+                    alert('CurveIn: -2 (Slow in Fast out)');
+                    var easeIn = new KeyframeEase(0, 75);
+                    var easeOut = new KeyframeEase(0, 0.1);
+                    propHandle.setTemporalEaseAtKey(1, [easeIn]);
+                    propHandle.setTemporalEaseAtKey(2, [easeOut]);
+                } else {
+                    alert('(unregistered) CurveIn: ' + clip.CurveIn);
+                }
             }
             if (clip.FadeTimeOut > 0) {
-                handle.setValueAtTime(layer.outPoint - (clip.FadeTimeOut / 1000), maxValue);
-                handle.setValueAtTime(layer.outPoint, minValue);
+                propHandle.setValueAtTime(layer.outPoint - (clip.FadeTimeOut / 1000), maxValue);
+                propHandle.setValueAtTime(layer.outPoint, minValue);
             }
         }
     
@@ -189,14 +233,18 @@ function drawPanel(rootPanel) {
     var grpOptions = panel.add('group');
     grpOptions.orientation = 'row';
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order?');
-    
-    panel.add('button', undefined, 'Import EDL...').onClick = function() { 
-        var compWidth = parseInt(txtCompWidth.text);
-        var compHeight = parseInt(txtCompHeight.text);
-        var compFrameRate = parseInt(txtCompFrameRate.text);
-        main(compWidth, compHeight, compFrameRate, chkReverseLayerOrder.value);
-        panel.close(); // If running undocked
+
+    panel.add('button', undefined, 'Import EDL...').onClick = function() {
     };
+    var options = {
+        compWidth: parseInt(txtCompWidth.text),
+        compHeight: parseInt(txtCompHeight.text),
+        compFrameRate: parseInt(txtCompFrameRate.text),
+        compPixelAspect: 1,
+        reverseLayerOrder: chkReverseLayerOrder.value
+    }
+    main(options);
+    panel.close(); // If running undocked
 
     return panel;
 }
@@ -213,6 +261,10 @@ if (panel instanceof Window) {
     panel.layout.resize();
 }
 
+// TODO : fix media sources importing when they already exist
+// mirror audio gain (at `if (mediaType === 'audio')`)
+// Mark keyframes (optional)
+// if in/out points are the same, merge both layers into one
 // rename/recolor repeating datasources where one is audio, other is video
 // rainbow color layers like in fl?
 // applyPreset to every clip?
