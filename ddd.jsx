@@ -5,17 +5,17 @@ function main(options) {
         alert('No file selected!');
         return;
     }
-    
+
     function parseEDL(edlFile) {
         edlFile.open('r');
         var lines = edlFile.read().split('\n');
         edlFile.close();
-    
+
         // Remove last row (expected to be blank)
         lines.pop(); // TODO: Check whether last row is blank
-    
+
         var colNames = lines.shift().replace(/"/g, '').split(';');
-    
+
         var edl = []; // Array of clips (aka "reels")
         for (var rowIndex = 0; rowIndex < lines.length; rowIndex++) { 
             var cols = lines[rowIndex].replace(/"/g, '').split('; ');
@@ -26,7 +26,7 @@ function main(options) {
                 continue;
             }
         }
-    
+
         // perhaps have a dictionary of field names and functions to both cast and convert (e.g secs to ms)
         var floatFields = [
             // "Length", // This is just StreamLength cast to int
@@ -38,16 +38,16 @@ function main(options) {
             'FadeTimeIn',
             'FadeTimeOut'
         ];
-    
+
         for (var i = 0; i < floatFields.length; i++) {
             for (var j = 0; j < edl.length; j++) {
                 edl[j][floatFields[i]] = parseFloat(edl[j][floatFields[i]]);
             }
         }
-    
+
         return edl;
     }
-    
+
     var edl = parseEDL(edlFile);
     if (options['reverseLayerOrder'])
         edl.reverse();
@@ -61,23 +61,9 @@ function main(options) {
         compBaseDuration,
         options.compFrameRate
     );
-    
+
     var failedImports = {};
     var ignoreFailedImports = false;
-
-    function findFootageItem(edlClip, clipFile) {
-        // TODO: Why loop from 1?
-        for (var j = 1; j <= app.project.numItems; j++) {
-            var projectItem = app.project.items[j];
-
-            // Solids have no FileName
-            if (!edlClip.FileName && projectItem instanceof SolidSource)
-                return projectItem;
-            else if (projectItem.file && projectItem.file.fullName === clipFile.fullName)
-                return projectItem;
-            else continue;
-        }
-    }
 
     function getPlaceholder(edlClip) {
         return app.project.importPlaceholder(
@@ -100,6 +86,19 @@ function main(options) {
             options['compPixelAspect']
         );
         return footageItem;
+    }
+    function findFootageItem(edlClip, clipFile) {
+        // TODO: Why loop from 1?
+        for (var j = 1; j <= app.project.numItems; j++) {
+            var projectItem = app.project.items[j];
+
+            // Solids have no FileName
+            if (!edlClip.FileName && projectItem instanceof SolidSource)
+                return projectItem;
+            else if (projectItem.file && projectItem.file.fullName === clipFile.fullName)
+                return projectItem;
+            else continue;
+        }
     }
 
     function importFootage(edlClip) {
@@ -131,43 +130,41 @@ function main(options) {
             continue;
         var footageItem = importFootage(clip);
         var layer = comp.layers.add(footageItem);
-    
+
         // Timeline position
         layer.startTime = clip.StartTime / 1000;
         layer.endTime = (clip.StartTime + clip.StreamLength) / 1000;
-    
+
         // Trim points
         layer.inPoint = clip.StreamStart / 1000;
         layer.outPoint = (clip.StartTime + clip.StreamLength) / 1000;
-    
+
         layer.stretch = clip.PlayRate * 100;
-    
+
         function applyFades(propHandle) {
             var minValue = 0;
             var maxValue = 100;
-    
+
             if (clip.FadeTimeIn > 0) {
                 propHandle.setValueAtTime(layer.inPoint, minValue); 
                 propHandle.setValueAtTime(layer.inPoint + (clip.FadeTimeIn / 1000), maxValue);
 
                 if (clip.CurveIn == 1) {
                     // Linear
-                    alert('CurveIn: 1 (Linear)');
                     // return;
                 } else if (clip.CurveIn == 4) {
                     // Easy Ease
-                    alert('CurveIn: 4 (Easy Ease)');
                     var easyEase = new KeyframeEase(0, 33.33);
                     propHandle.setTemporalEaseAtKey(1, [easyEase]);
                     propHandle.setTemporalEaseAtKey(2, [easyEase]);
                 } else if (clip.CurveIn == 2) {
-                    alert('CurveIn: 2 (Fast in Slow out)');
+                    // Fast in, slow out  
                     var easeIn = new KeyframeEase(0, 0.1);
                     var easeOut = new KeyframeEase(0, 75);
                     propHandle.setTemporalEaseAtKey(1, [easeIn]);
                     propHandle.setTemporalEaseAtKey(2, [easeOut]);
                 } else if (clip.CurveIn == -2) {
-                    alert('CurveIn: -2 (Slow in Fast out)');
+                    // Slow in, fast out
                     var easeIn = new KeyframeEase(0, 75);
                     var easeOut = new KeyframeEase(0, 0.1);
                     propHandle.setTemporalEaseAtKey(1, [easeIn]);
@@ -181,7 +178,7 @@ function main(options) {
                 propHandle.setValueAtTime(layer.outPoint, minValue);
             }
         }
-    
+
         var mediaType = clip.MediaType.toLowerCase();
         if (mediaType === 'audio') { 
             layer.enabled = false; // Disables video
@@ -194,7 +191,7 @@ function main(options) {
         } else {
             alert('Media type not supported: ' + clip.MediaType); 
         }
-    
+
         // TODO: Fix comp duration (exess end time)
         // prev: layer.outPoint - layer.inPoint
         var clipDuration = clip.StreamLength / 1000;
@@ -215,15 +212,15 @@ function drawPanel(rootPanel) {
 
     var grpComp = subpanelComp.add('group');
     grpComp.orientation = 'row';
-    
+
     grpComp.add('statictext', undefined, 'Width:'); 
     txtCompWidth = grpComp.add('edittext', undefined, '1920');
     txtCompWidth.characters = 4; 
-    
+
     grpComp.add('statictext', undefined, 'Height:'); 
     txtCompHeight = grpComp.add('edittext', undefined, '1080');
     txtCompHeight.characters = 4; 
-    
+
     grpComp.add('statictext', undefined, 'Frame Rate:'); 
     txtCompFrameRate = grpComp.add('edittext', undefined, '24');
     txtCompFrameRate.characters = 2;
@@ -234,16 +231,16 @@ function drawPanel(rootPanel) {
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order?');
 
     panel.add('button', undefined, 'Import EDL...').onClick = function() {
+        var options = {
+            compWidth: parseInt(txtCompWidth.text),
+            compHeight: parseInt(txtCompHeight.text),
+            compFrameRate: parseInt(txtCompFrameRate.text),
+            compPixelAspect: 1,
+            reverseLayerOrder: chkReverseLayerOrder.value
+        }
+        main(options);
+        panel.close(); // If running undocked
     };
-    var options = {
-        compWidth: parseInt(txtCompWidth.text),
-        compHeight: parseInt(txtCompHeight.text),
-        compFrameRate: parseInt(txtCompFrameRate.text),
-        compPixelAspect: 1,
-        reverseLayerOrder: chkReverseLayerOrder.value
-    }
-    main(options);
-    panel.close(); // If running undocked
 
     return panel;
 }
