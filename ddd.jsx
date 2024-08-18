@@ -109,21 +109,20 @@ function main(options) {
         if (footageItem)
             return footageItem;
 
-        // Don't show this warning for Solids
-        if (!ignoreFailedImports && edlClip.FileName) {
-            ignoreFailedImports = Window.confirm(
-                'Failed to import file:\n' + edlClip.FileName +
-                '\nA placeholder will be used instead.' +
-                '\n\nPress OK to suppress this warning.'
-            );
-        }
-
         if (!edlClip.FileName)
             return getSolid(edlClip);
         else if (clipFile.exists)
             return app.project.importFile(new ImportOptions(clipFile));
-        else
+        else {
+            if (!ignoreFailedImports) {
+                ignoreFailedImports = Window.confirm(
+                    'Failed to import file:\n' + edlClip.FileName +
+                    '\nA placeholder will be used instead.' +
+                    '\n\nPress OK to suppress this warning.'
+                );
+            }
             return getPlaceholder(edlClip);
+        }
     }
 
     for (var clipIndex = 0; clipIndex < edl.length; clipIndex++) {
