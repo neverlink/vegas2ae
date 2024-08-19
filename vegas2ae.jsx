@@ -149,25 +149,26 @@ function main(options) {
         layer.inPoint = clip.StreamStart / 1000;
         layer.outPoint = (clip.StartTime + clip.StreamLength) / 1000;
 
-        layer.stretch = clip.PlayRate * 100;
+        layer.stretch = clip.PlayRate * 100; // Time stretch
+        layer.label = (clipIndex + 1) % 16; // Layer color
 
-        function applyFades(clip, propHandle) {
+        function applyFades(clip, layer, propHandle) {
             function getKeyframeEase(curveType) {
                 var easeIn;
                 var easeOut;
 
                 if (curveType == 1) { // Linear
                     return null;
-                } else if (curveType == 4) { // Easy Ease
-                    easeIn = new KeyframeEase(0, 33.33);
-                    easeOut = easeIn;
                 } else if (curveType == -2) { // Slow in, fast out
                     easeIn = new KeyframeEase(0, 75);
                     easeOut = new KeyframeEase(0, 0.1);
                 } else if (curveType == 2) { // Fast in, slow out
                     easeIn = new KeyframeEase(0, 0.1);
                     easeOut = new KeyframeEase(0, 75);
-                } else if (curveType == -4) { // Inverse Easy Ease                    
+                } else if (curveType == 4) { // Easy Ease
+                    easeIn = new KeyframeEase(0, 33.33);
+                    easeOut = easeIn;
+                } else if (curveType == -4) { // Inverted Easy Ease                    
                     easeIn = new KeyframeEase(100, 5);
                     easeOut = easeIn;
                 } else {
@@ -181,24 +182,42 @@ function main(options) {
             var maxValue = 100;
 
             if (clip.FadeTimeIn > 0) {
-                propHandle.setValueAtTime(layer.inPoint, minValue);
-                propHandle.setValueAtTime(layer.inPoint + (clip.FadeTimeIn / 1000), maxValue);
+                var fadeStart = layer.inPoint;
+                var fadeEnd = fadeStart + (clip.FadeTimeIn / 1000);
+                propHandle.setValueAtTime(fadeStart, minValue);
+                propHandle.setValueAtTime(fadeEnd, maxValue);
                 
                 var easeArgs = getKeyframeEase(clip.CurveIn);
                 if (easeArgs) {
                     propHandle.setTemporalEaseAtKey(1, [easeArgs[0]]);
                     propHandle.setTemporalEaseAtKey(2, [easeArgs[1]]);
                 }
+
+                if (options['markKeyframes']) { 
+                    var marker = new MarkerValue("Fade In");
+                    marker.duration = fadeEnd - fadeStart;
+                    layer.marker.setValueAtTime(fadeStart, marker);
+                }
             }
+
             if (clip.FadeTimeOut > 0) {
-                propHandle.setValueAtTime(layer.outPoint - (clip.FadeTimeOut / 1000), maxValue);
-                propHandle.setValueAtTime(layer.outPoint, minValue);
+                var fadeStart = layer.outPoint - (clip.FadeTimeOut / 1000);
+                var fadeEnd = layer.outPoint;
                 
+                propHandle.setValueAtTime(fadeStart, maxValue);
+                propHandle.setValueAtTime(fadeEnd, minValue);
+
                 var easeArgs = getKeyframeEase(clip.CurveOut);
                 if (easeArgs) {
-                    propHandle.setTemporalEaseAtKey(3, [easeArgs[0]]);
-                    propHandle.setTemporalEaseAtKey(4, [easeArgs[1]]);
-                }; 
+                    propHandle.setTemporalEaseAtKey(propHandle.numKeys - 1, [easeArgs[0]]);
+                    propHandle.setTemporalEaseAtKey(propHandle.numKeys, [easeArgs[1]]);
+                };
+
+                if (options['markKeyframes']) {
+                    var marker = new MarkerValue("Fade Out");
+                    marker.duration = fadeEnd - fadeStart;
+                    layer.marker.setValueAtTime(fadeStart, marker);
+                }
             }
         }
 
@@ -206,11 +225,11 @@ function main(options) {
         if (mediaType === 'audio') { 
             layer.enabled = false; // Disables video
             var mixer = layer.Effects.addProperty('Stereo Mixer');
-            applyFades(clip, mixer['Left Level']); 
-            applyFades(clip, mixer['Right Level']);
+            applyFades(clip, layer, mixer['Left Level']); 
+            applyFades(clip, layer, mixer['Right Level']);
         } else if (mediaType === 'video') {
             layer.audioEnabled = false; // Disables audio
-            applyFades(clip, layer['opacity']);
+            applyFades(clip, layer, layer['opacity']);  
         } else {
             alert('Media type not supported: ' + clip.MediaType); 
         }
@@ -257,23 +276,21 @@ function drawPanel(rootPanel) {
     txtSolidColorHex.characters = 6;
 
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
-    chkMarkKeyframes.value = true;
-
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
 
     panel.add('button', undefined, 'Import EDL...').onClick = function() {
+        var options = {
+            compWidth: parseInt(txtCompWidth.text),
+            compHeight: parseInt(txtCompHeight.text),
+            compFrameRate: parseInt(txtCompFrameRate.text),
+            compPixelAspect: 1,
+            solidColorHex: txtSolidColorHex.text,
+            markKeyframes: chkMarkKeyframes.value,
+            reverseLayerOrder: chkReverseLayerOrder.value
+        }
+        main(options);
+        panel.close(); // If running undocked
     };
-    var options = {
-        compWidth: parseInt(txtCompWidth.text),
-        compHeight: parseInt(txtCompHeight.text),
-        compFrameRate: parseInt(txtCompFrameRate.text),
-        compPixelAspect: 1,
-        solidColorHex: txtSolidColorHex.text,
-        markKeyframes: chkMarkKeyframes.value,
-        reverseLayerOrder: chkReverseLayerOrder.value
-    }
-    main(options);
-    panel.close(); // If running undocked
         
     return panel;
 }
@@ -290,10 +307,5 @@ if (panel instanceof Window) {
     panel.layout.resize();
 }
 
-// TODO : fix media sources importing when they already exist
 // mirror audio gain (at `if (mediaType === 'audio')`)
-// Mark keyframes (optional)
 // if in/out points are the same, merge both layers into one
-// rename/recolor repeating datasources where one is audio, other is video
-// rainbow color layers like in fl?
-// applyPreset to every clip?
