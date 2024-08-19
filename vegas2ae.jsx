@@ -98,11 +98,11 @@ function main(options) {
         );
         return footageItem;
     }
+
     function findFootageItem(edlClip, clipFile) {
-        // TODO: Why loop from 1?
+        // Project items are indexed from 1
         for (var j = 1; j <= app.project.numItems; j++) {
             var projectItem = app.project.items[j];
-
             // Solids have no FileName
             if (!edlClip.FileName && projectItem instanceof SolidSource)
                 return projectItem;
@@ -151,41 +151,54 @@ function main(options) {
 
         layer.stretch = clip.PlayRate * 100;
 
-        function applyFades(propHandle) {
+        function applyFades(clip, propHandle) {
+            function getKeyframeEase(curveType) {
+                var easeIn;
+                var easeOut;
+
+                if (curveType == 1) { // Linear
+                    return null;
+                } else if (curveType == 4) { // Easy Ease
+                    easeIn = new KeyframeEase(0, 33.33);
+                    easeOut = easeIn;
+                } else if (curveType == -2) { // Slow in, fast out
+                    easeIn = new KeyframeEase(0, 75);
+                    easeOut = new KeyframeEase(0, 0.1);
+                } else if (curveType == 2) { // Fast in, slow out
+                    easeIn = new KeyframeEase(0, 0.1);
+                    easeOut = new KeyframeEase(0, 75);
+                } else if (curveType == -4) { // Inverse Easy Ease                    
+                    easeIn = new KeyframeEase(100, 5);
+                    easeOut = easeIn;
+                } else {
+                    alert('Unregistered CurveType: ' + curveType);
+                }
+
+                return easeIn && easeOut ? [easeIn, easeOut] : null;
+            }
+
             var minValue = 0;
             var maxValue = 100;
 
             if (clip.FadeTimeIn > 0) {
-                propHandle.setValueAtTime(layer.inPoint, minValue); 
+                propHandle.setValueAtTime(layer.inPoint, minValue);
                 propHandle.setValueAtTime(layer.inPoint + (clip.FadeTimeIn / 1000), maxValue);
-
-                if (clip.CurveIn == 1) {
-                    // Linear
-                    // return;
-                } else if (clip.CurveIn == 4) {
-                    // Easy Ease
-                    var easyEase = new KeyframeEase(0, 33.33);
-                    propHandle.setTemporalEaseAtKey(1, [easyEase]);
-                    propHandle.setTemporalEaseAtKey(2, [easyEase]);
-                } else if (clip.CurveIn == 2) {
-                    // Fast in, slow out  
-                    var easeIn = new KeyframeEase(0, 0.1);
-                    var easeOut = new KeyframeEase(0, 75);
-                    propHandle.setTemporalEaseAtKey(1, [easeIn]);
-                    propHandle.setTemporalEaseAtKey(2, [easeOut]);
-                } else if (clip.CurveIn == -2) {
-                    // Slow in, fast out
-                    var easeIn = new KeyframeEase(0, 75);
-                    var easeOut = new KeyframeEase(0, 0.1);
-                    propHandle.setTemporalEaseAtKey(1, [easeIn]);
-                    propHandle.setTemporalEaseAtKey(2, [easeOut]);
-                } else {
-                    alert('(unregistered) CurveIn: ' + clip.CurveIn);
+                
+                var easeArgs = getKeyframeEase(clip.CurveIn);
+                if (easeArgs) {
+                    propHandle.setTemporalEaseAtKey(1, [easeArgs[0]]);
+                    propHandle.setTemporalEaseAtKey(2, [easeArgs[1]]);
                 }
             }
             if (clip.FadeTimeOut > 0) {
                 propHandle.setValueAtTime(layer.outPoint - (clip.FadeTimeOut / 1000), maxValue);
                 propHandle.setValueAtTime(layer.outPoint, minValue);
+                
+                var easeArgs = getKeyframeEase(clip.CurveOut);
+                if (easeArgs) {
+                    propHandle.setTemporalEaseAtKey(3, [easeArgs[0]]);
+                    propHandle.setTemporalEaseAtKey(4, [easeArgs[1]]);
+                }; 
             }
         }
 
@@ -193,11 +206,11 @@ function main(options) {
         if (mediaType === 'audio') { 
             layer.enabled = false; // Disables video
             var mixer = layer.Effects.addProperty('Stereo Mixer');
-            applyFades(mixer['Left Level']); 
-            applyFades(mixer['Right Level']);
+            applyFades(clip, mixer['Left Level']); 
+            applyFades(clip, mixer['Right Level']);
         } else if (mediaType === 'video') {
             layer.audioEnabled = false; // Disables audio
-            applyFades(layer['opacity']);
+            applyFades(clip, layer['opacity']);
         } else {
             alert('Media type not supported: ' + clip.MediaType); 
         }
@@ -229,7 +242,7 @@ function drawPanel(rootPanel) {
 
     grpComp.add('statictext', undefined, 'Height:'); 
     var txtCompHeight = grpComp.add('edittext', undefined, '1080');
-    txtCompHeight.characters = 4; 
+    txtCompHeight.characters = 4;
 
     grpComp.add('statictext', undefined, 'Frame Rate:'); 
     txtCompFrameRate = grpComp.add('edittext', undefined, '24');
@@ -238,23 +251,29 @@ function drawPanel(rootPanel) {
     // Import options
     var grpOptions = panel.add('group');
     grpOptions.orientation = 'row';
+
     grpOptions.add('statictext', undefined, 'Solid Color:');
-    var txtSolidColorHex = grpOptions.add('edittext', undefined, '#fff');
+    var txtSolidColorHex = grpOptions.add('edittext', undefined, '#FFFFFF');
     txtSolidColorHex.characters = 6;
+
+    var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
+    chkMarkKeyframes.value = true;
+
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
 
     panel.add('button', undefined, 'Import EDL...').onClick = function() {
-        var options = {
-            compWidth: parseInt(txtCompWidth.text),
-            compHeight: parseInt(txtCompHeight.text),
-            compFrameRate: parseInt(txtCompFrameRate.text),
-            compPixelAspect: 1,
-            solidColorHex: txtSolidColorHex.text,
-            reverseLayerOrder: chkReverseLayerOrder.value
-        }
-        main(options);
-        panel.close(); // If running undocked
     };
+    var options = {
+        compWidth: parseInt(txtCompWidth.text),
+        compHeight: parseInt(txtCompHeight.text),
+        compFrameRate: parseInt(txtCompFrameRate.text),
+        compPixelAspect: 1,
+        solidColorHex: txtSolidColorHex.text,
+        markKeyframes: chkMarkKeyframes.value,
+        reverseLayerOrder: chkReverseLayerOrder.value
+    }
+    main(options);
+    panel.close(); // If running undocked
         
     return panel;
 }
