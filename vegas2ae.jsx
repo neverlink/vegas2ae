@@ -29,7 +29,7 @@ function main(options) {
 
         // perhaps have a dictionary of field names and functions to both cast and convert (e.g secs to ms)
         var floatFields = [
-            // "Length", // This is just StreamLength cast to int
+            'Length',
             'StartTime', 
             'StreamStart',
             'StreamLength',
@@ -52,7 +52,7 @@ function main(options) {
     if (options['reverseLayerOrder'])
         edl.reverse();
 
-    var compBaseDuration = 1; // Subtracted later // Default for now, must be calculated
+    var compBaseDuration = 10; // Subtracted later // Default for now, must be calculated
     var comp = app.project.items.addComp(
         edlFile.name.split('.txt')[0],
         options.compWidth,
@@ -141,15 +141,18 @@ function main(options) {
         var footageItem = importFootage(clip);
         var layer = comp.layers.add(footageItem);
 
-        // Trim points (offset by 1 frame for correct positioning)
-        layer.inPoint = (clip.StreamStart / 1000) + comp.frameDuration;
-        layer.outPoint = (clip.StreamStart + clip.StreamLength) / 1000 + comp.frameDuration;
-        
+        // Stretch layer first (if necessary)
+        layer.stretch = 100 / clip.PlayRate;
+
+        // Trim points (snapped to the closest frame)
+        layer.inPoint = Math.round((clip.StreamStart / 1000) / comp.frameDuration) * comp.frameDuration;
+        layer.outPoint = Math.round((clip.StreamStart / 1000 + clip.Length / 1000) / comp.frameDuration) * comp.frameDuration; 
+
         // Timeline position
         layer.startTime = (clip.StartTime / 1000) - layer.inPoint;
-
-        layer.stretch = clip.PlayRate * 100; // Time stretch
-        layer.label = (clipIndex + 1) % 16; // Layer color
+    
+        // Layer color
+        layer.label = (clipIndex + 1) % 16; 
 
         function applyFades(clip, layer, propHandle) {
             function getKeyframeEase(curveType) {
@@ -233,14 +236,13 @@ function main(options) {
             alert('Media type not supported: ' + clip.MediaType); 
         }
 
-        // TODO: Fix comp duration (exess end time)
-        // prev: layer.outPoint - layer.inPoint
-        var clipDuration = clip.StreamLength / 1000;
+        var clipDuration = layer.outPoint - layer.inPoint;
         comp.duration += clipDuration;
     }
 
-    comp.duration -= compBaseDuration;
+    // comp.duration -= compBaseDuration;
     comp.openInViewer();
+    return comp;
 }
 
 function drawPanel(rootPanel) {
@@ -276,7 +278,8 @@ function drawPanel(rootPanel) {
 
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
-
+    
+    var comp;
     panel.add('button', undefined, 'Import EDL...').onClick = function() {
         var options = {
             compWidth: parseInt(txtCompWidth.text),
@@ -287,10 +290,10 @@ function drawPanel(rootPanel) {
             markKeyframes: chkMarkKeyframes.value,
             reverseLayerOrder: chkReverseLayerOrder.value
         }
-        main(options);
-        panel.close(); // If running undocked
+        comp = main(options);
+        // panel.close(); // If running undocked
     };
-        
+
     return panel;
 }
 
@@ -308,3 +311,4 @@ if (panel instanceof Window) {
 
 // mirror audio gain (at `if (mediaType === 'audio')`)
 // if in/out points are the same, merge both layers into one
+// fix comp duration, remove double quotes & those if/elses
