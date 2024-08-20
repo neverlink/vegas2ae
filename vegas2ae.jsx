@@ -141,13 +141,12 @@ function main(options) {
         var footageItem = importFootage(clip);
         var layer = comp.layers.add(footageItem);
 
+        // Trim points (offset by 1 frame for correct positioning)
+        layer.inPoint = (clip.StreamStart / 1000) + comp.frameDuration;
+        layer.outPoint = (clip.StreamStart + clip.StreamLength) / 1000 + comp.frameDuration;
+        
         // Timeline position
-        layer.startTime = clip.StartTime / 1000;
-        layer.endTime = (clip.StartTime + clip.StreamLength) / 1000;
-
-        // Trim points
-        layer.inPoint = clip.StreamStart / 1000;
-        layer.outPoint = (clip.StartTime + clip.StreamLength) / 1000;
+        layer.startTime = (clip.StartTime / 1000) - layer.inPoint;
 
         layer.stretch = clip.PlayRate * 100; // Time stretch
         layer.label = (clipIndex + 1) % 16; // Layer color
