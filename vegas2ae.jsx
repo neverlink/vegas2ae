@@ -2,18 +2,23 @@ function getKeyframeEase(curveType) {
     var easeIn;
     var easeOut;
 
-    if (curveType == 1) { // Linear
+    if (curveType == 1) { 
+        // Linear
         return null;
-    } else if (curveType == -2) { // Slow in, fast out
+    } else if (curveType == -2) {
+        // Slow in, fast out
         easeIn = new KeyframeEase(0, 75);
         easeOut = new KeyframeEase(0, 0.1);
-    } else if (curveType == 2) { // Fast in, slow out
+    } else if (curveType == 2) {
+        // Fast in, slow out
         easeIn = new KeyframeEase(0, 0.1);
         easeOut = new KeyframeEase(0, 75);
-    } else if (curveType == 4) { // Easy Ease
+    } else if (curveType == 4) {
+        // Easy Ease
         easeIn = new KeyframeEase(0, 33.33);
         easeOut = easeIn;
-    } else if (curveType == -4) { // Inverted Easy Ease                    
+    } else if (curveType == -4) {
+        // Inverted Easy Ease
         easeIn = new KeyframeEase(100, 5);
         easeOut = easeIn;
     } else {
@@ -25,7 +30,7 @@ function getKeyframeEase(curveType) {
 
 function applyFades(clip, layer, propHandle, markKeyframes) {
     var minValue = 0;
-    var maxValue = 100;
+    var maxValue = propHandle.value;
 
     if (clip.FadeTimeIn > 0) {
         var fadeStart = layer.inPoint;
@@ -83,8 +88,10 @@ function getSolid(edlClip, options) {
     
     function hexToFloats(hex) {
         hex = hex.replace(/^#/, '');
-        if (!(hex.length !== 3 || hex.length !== 6))
-            alert('Invalid hex code!');
+        if (hex.length !== 3 || hex.length !== 6) {
+            alert('Invalid hex code provided!\n\nDefaulting to black for solids.');  
+            return [0, 0, 0];
+        }
         if (hex.length === 3) // Expand shorthand (e.g., #abc -> #aabbcc)
           hex = hex.split('').map(function(c) {return c + c}).join('');
         var r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -100,7 +107,7 @@ function getSolid(edlClip, options) {
         options['compHeight'],
         options['compPixelAspect']
     );
-    
+
     return footageItem;
 }
 
@@ -268,26 +275,26 @@ function drawPanel(rootPanel) {
     grpOptions.orientation = 'row';
 
     grpOptions.add('statictext', undefined, 'Solid Color:');
-    var txtSolidColorHex = grpOptions.add('edittext', undefined, '#FFFFFF');
+    var txtSolidColorHex = grpOptions.add('edittext', undefined, '#000000');
     txtSolidColorHex.characters = 6;
 
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
     
     panel.add('button', undefined, 'Import EDL...').onClick = function() {
+        var options = {
+            compWidth: parseInt(txtCompWidth.text),
+            compHeight: parseInt(txtCompHeight.text),
+            compFrameRate: parseInt(txtCompFrameRate.text),
+            compPixelAspect: 1,
+            ignoreFailedImports: false,
+            solidColorHex: txtSolidColorHex.text,
+            markKeyframes: chkMarkKeyframes.value,
+            reverseLayerOrder: chkReverseLayerOrder.value
+        }
+        main(options);
+        panel.close(); // If running undocked
     };
-    var options = {
-        compWidth: parseInt(txtCompWidth.text),
-        compHeight: parseInt(txtCompHeight.text),
-        compFrameRate: parseInt(txtCompFrameRate.text),
-        compPixelAspect: 1,
-        ignoreFailedImports: false,
-        solidColorHex: txtSolidColorHex.text,
-        markKeyframes: chkMarkKeyframes.value,
-        reverseLayerOrder: chkReverseLayerOrder.value
-    }
-    main(options);
-    // panel.close(); // If running undocked
 
     return panel;
 }
