@@ -149,9 +149,8 @@ function parseEDL(edlFile) {
     edlFile.close();
 
     // Remove last row (expected to be blank)
-    if (!lines[lines.length - 1]) {
+    if (!lines[lines.length - 1])
         lines.pop();
-    }
 
     var colNames = lines.shift().replace(/"/g, '').split(';');
 
@@ -160,6 +159,7 @@ function parseEDL(edlFile) {
         StartTime: function(value) { return parseFloat(value) / 1000 },
         StreamStart: function(value) { return parseFloat(value) / 1000 },
         PlayRate: function(value) { return parseFloat(value) },
+        SustainGain: function(value) { return parseFloat(value) },
         FadeTimeIn: function(value) { return parseFloat(value) / 1000 },
         FadeTimeOut: function(value) { return parseFloat(value) / 1000 },
     };
@@ -182,7 +182,7 @@ function parseEDL(edlFile) {
     return edl;
 }
 
-function main(options) {
+function importEDL(options) {
     var edlFile;
     edlFile = File.openDialog('Select an EDL file');
     if (!edlFile) {
@@ -231,6 +231,8 @@ function main(options) {
         if (mediaType === 'audio') { 
             layer.enabled = false; // Disables video
             var mixer = layer.Effects.addProperty('Stereo Mixer');
+            mixer['Left Level'].setValue(100 * clip.SustainGain);
+            mixer['Right Level'].setValue(100 * clip.SustainGain);
             applyFades(clip, layer, mixer['Left Level'], markKeyframes);
             applyFades(clip, layer, mixer['Right Level'], markKeyframes);
         } else if (mediaType === 'video') {
@@ -281,7 +283,7 @@ function drawPanel(rootPanel) {
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
     
-    panel.add('button', undefined, 'Import EDL...').onClick = function() {
+    function runImport() {
         var options = {
             compWidth: parseInt(txtCompWidth.text),
             compHeight: parseInt(txtCompHeight.text),
@@ -292,9 +294,12 @@ function drawPanel(rootPanel) {
             markKeyframes: chkMarkKeyframes.value,
             reverseLayerOrder: chkReverseLayerOrder.value
         }
-        main(options);
+        importEDL(options);
         panel.close(); // If running undocked
-    };
+    }
+
+    panel.add('button', undefined, 'Import EDL...').onClick = runImport;
+    runImport(); // Debug only
 
     return panel;
 }
@@ -311,6 +316,5 @@ if (panel instanceof Window) {
     panel.layout.resize();
 }
 
-// mirror audio gain (at `if (mediaType === 'audio')`)
 // if in/out points are the same, merge both layers into one
 // fix comp duration
