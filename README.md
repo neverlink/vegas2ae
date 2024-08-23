@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img height=125em height="100px" src="https://github.com/user-attachments/assets/aceb1099-3ccb-4713-8b65-432116d3adf3"></img>
+  <img height=125em height="100px" src="https://github.com/user-attachments/assets/8a7c6ae2-dfb0-4a46-973c-0e6c1f6e49dc"></img>
   </br>
   Vegas2AE
 </h1>
@@ -10,6 +10,7 @@
   - Applicable to both Audio & Video
   - All 5 fade curves supported
 - Audio gain control
+
 - Placeholders for missing media
 - Solids (limited to a single configurable color)
 
