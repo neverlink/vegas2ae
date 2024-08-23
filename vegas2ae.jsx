@@ -75,9 +75,9 @@ function applyFades(clip, layer, propHandle, markKeyframes) {
 function getPlaceholder(edlClip, options) {
     return app.project.importPlaceholder(
         edlClip.FileName,
-        options['compWidth'],
-        options['compHeight'],
-        options['compFrameRate'],
+        options.compWidth,
+        options.compHeight,
+        options.compFrameRate,
         edlClip.Length
     )
 }
@@ -85,30 +85,13 @@ function getPlaceholder(edlClip, options) {
 function getSolid(edlClip, options) {
     edlClip.FileName = 'Solid';
     var footageItem = getPlaceholder(edlClip, options);
-    
-    function hexToFloats(hex) {
-        hex = hex.replace(/^#/, '');
-        if (hex.length !== 3 || hex.length !== 6) {
-            alert('Invalid hex code provided!\n\nDefaulting to black for solids.');  
-            return [0, 0, 0];
-        }
-        if (hex.length === 3) // Expand shorthand (e.g., #abc -> #aabbcc)
-          hex = hex.split('').map(function(c) {return c + c}).join('');
-        var r = parseInt(hex.substring(0, 2), 16) / 255;
-        var g = parseInt(hex.substring(2, 4), 16) / 255;
-        var b = parseInt(hex.substring(4, 6), 16) / 255;
-        return [r, g, b];
-    }
-    
-    footageItem.replaceWithSolid(
-        hexToFloats(options['solidColorHex']),
+    return footageItem.replaceWithSolid(
+        options.solidColorRGB,
         'Solid',
-        options['compWidth'],
-        options['compHeight'],
-        options['compPixelAspect']
+        options.compWidth,
+        options.compHeight,
+        options.compPixelAspect
     );
-
-    return footageItem;
 }
 
 function findFootageItem(edlClip, clipFile) {
@@ -133,8 +116,8 @@ function importFootage(edlClip, options) {
         return getSolid(edlClip, options);
     if (clipFile.exists)
         return app.project.importFile(new ImportOptions(clipFile));
-    if (!options['ignoreFailedImports']) {
-        options['ignoreFailedImports'] = Window.confirm(
+    if (!options.ignoreFailedImports) {
+        options.ignoreFailedImports = Window.confirm(
             'Failed to import file:\n' + edlClip.FileName +
             '\nA placeholder will be used instead.' +
             '\n\nPress OK to suppress this warning.'
@@ -191,11 +174,11 @@ function importEDL(options) {
     }
 
     var edl = parseEDL(edlFile);
-     if (options['reverseLayerOrder'])
+     if (options.reverseLayerOrder)
         edl.reverse();
 
     var compBaseDuration = 1; // Subtracted later
-    var comp = app.project.items.addComp(
+    var comp = app.project.items.addComp(   
         edlFile.name.split('.txt')[0],
         options.compWidth,
         options.compHeight,
@@ -203,6 +186,7 @@ function importEDL(options) {
         compBaseDuration,
         options.compFrameRate
     );
+    comp.bgColor = options.compBgColorRGB;
 
     var failedImports = {};
 
@@ -227,7 +211,7 @@ function importEDL(options) {
         layer.label = (clipIndex + 1) % 16; 
 
         var mediaType = clip.MediaType.toLowerCase();
-        var markKeyframes = options['markKeyframes'];
+        var markKeyframes = options.markKeyframes;
         if (mediaType === 'audio') { 
             layer.enabled = false; // Disables video
             var mixer = layer.Effects.addProperty('Stereo Mixer');
@@ -249,6 +233,20 @@ function importEDL(options) {
     comp.openInViewer();
 }
 
+function hexToFloats(hex) {
+    hex = hex.replace(/^#/, '');
+    if (hex.length !== 3 || hex.length !== 6) {
+        alert('Invalid hex code provided!\n\nDefaulting to black for solids.');  
+        return [0, 0, 0];
+    }
+    if (hex.length === 3) // Expand shorthand (e.g., #abc -> #aabbcc)
+      hex = hex.split('').map(function(c) {return c + c}).join('');
+    var r = parseInt(hex.substring(0, 2), 16) / 255;
+    var g = parseInt(hex.substring(2, 4), 16) / 255;
+    var b = parseInt(hex.substring(4, 6), 16) / 255;
+    return [r, g, b];
+}
+
 function drawPanel(rootPanel) {
     var panel = (rootPanel instanceof Panel)
         ? rootPanel
@@ -257,20 +255,27 @@ function drawPanel(rootPanel) {
     // Composition settings
     var subpanelComp = panel.add('panel', undefined, 'Composition');  
 
-    var grpComp = subpanelComp.add('group');
-    grpComp.orientation = 'row';
+    var grpCompRow1 = subpanelComp.add('group');
+    grpCompRow1.orientation = 'row';
 
-    grpComp.add('statictext', undefined, 'Width:'); 
-    var txtCompWidth = grpComp.add('edittext', undefined, '1920');
+    grpCompRow1.add('statictext', undefined, 'Width:'); 
+    var txtCompWidth = grpCompRow1.add('edittext', undefined, '1920');
     txtCompWidth.characters = 4; 
 
-    grpComp.add('statictext', undefined, 'Height:'); 
-    var txtCompHeight = grpComp.add('edittext', undefined, '1080');
+    grpCompRow1.add('statictext', undefined, 'Height:'); 
+    var txtCompHeight = grpCompRow1.add('edittext', undefined, '1080');
     txtCompHeight.characters = 4;
 
-    grpComp.add('statictext', undefined, 'Frame Rate:'); 
-    txtCompFrameRate = grpComp.add('edittext', undefined, '24');
+    var grpCompRow2 = subpanelComp.add('group');
+    grpCompRow2.orientation = 'row';
+
+    grpCompRow2.add('statictext', undefined, 'Frame Rate:'); 
+    txtCompFrameRate = grpCompRow2.add('edittext', undefined, '24');
     txtCompFrameRate.characters = 2;
+
+    grpCompRow2.add('statictext', undefined, 'Background Color:');
+    var txtBgColorHex = grpCompRow2.add('edittext', undefined, '#000000');
+    txtBgColorHex.characters = 6;
 
     // Import options
     var grpOptions = panel.add('group');
@@ -289,17 +294,18 @@ function drawPanel(rootPanel) {
             compHeight: parseInt(txtCompHeight.text),
             compFrameRate: parseInt(txtCompFrameRate.text),
             compPixelAspect: 1,
-            ignoreFailedImports: false,
-            solidColorHex: txtSolidColorHex.text,
+            compBgColorRGB: hexToFloats(txtBgColorHex.text),
+            solidColorRGB: hexToFloats(txtBgColorHex.text),
             markKeyframes: chkMarkKeyframes.value,
-            reverseLayerOrder: chkReverseLayerOrder.value
+            reverseLayerOrder: chkReverseLayerOrder.value,
+            ignoreFailedImports: false
         }
         importEDL(options);
         panel.close(); // If running undocked
     }
 
     panel.add('button', undefined, 'Import EDL...').onClick = runImport;
-    runImport(); // Debug only
+    // runImport(); // Debug only
 
     return panel;
 }
