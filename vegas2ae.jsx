@@ -276,7 +276,7 @@ function drawPanel(rootPanel) {
     txtCompFrameRate.characters = 2;
 
     // Section 2
-    var compSection2 = panel.add('panel', undefined, 'Options');  
+    var compSection2 = panel.add('panel', undefined, 'Colour');  
     compSection2.alignment = ['fill', 'center'];
 
     // Color options
@@ -292,7 +292,7 @@ function drawPanel(rootPanel) {
     txtSolidColorHex.characters = 6;
 
     // Import options
-    var grpOptions = compSection2.add('group');
+    var grpOptions = panel.add('group');
     grpOptions.orientation = 'row';
 
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
