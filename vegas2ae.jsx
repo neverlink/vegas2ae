@@ -235,8 +235,11 @@ function importEDL(options) {
 
 function hexToFloats(hex) {
     hex = hex.replace(/^#/, '');
-    if (hex.length !== 3 || hex.length !== 6) {
-        alert('Invalid hex code provided!\n\nDefaulting to black for solids.');  
+    if (hex.length !== 3 && hex.length !== 6) {
+        alert(
+            'Hex color #' + hex + ' is invalid!' + '\n\n' +
+            'Defaulting to black for solids.'
+        );
         return [0, 0, 0];
     }
     if (hex.length === 3) // Expand shorthand (e.g., #abc -> #aabbcc)
@@ -252,10 +255,12 @@ function drawPanel(rootPanel) {
         ? rootPanel
         : new Window('palette', 'Vegas EDL Import', undefined);
 
-    // Composition settings
-    var subpanelComp = panel.add('panel', undefined, 'Composition');  
+    // Section 1
+    var compSection1 = panel.add('panel', undefined, 'Composition');  
+    compSection1.alignment = ['fill', 'center'];
 
-    var grpCompRow1 = subpanelComp.add('group');
+    // Composition settings
+    var grpCompRow1 = compSection1.add('group');
     grpCompRow1.orientation = 'row';
 
     grpCompRow1.add('statictext', undefined, 'Width:'); 
@@ -266,24 +271,29 @@ function drawPanel(rootPanel) {
     var txtCompHeight = grpCompRow1.add('edittext', undefined, '1080');
     txtCompHeight.characters = 4;
 
-    var grpCompRow2 = subpanelComp.add('group');
-    grpCompRow2.orientation = 'row';
-
-    grpCompRow2.add('statictext', undefined, 'Frame Rate:'); 
-    txtCompFrameRate = grpCompRow2.add('edittext', undefined, '24');
+    grpCompRow1.add('statictext', undefined, 'Frame Rate:'); 
+    txtCompFrameRate = grpCompRow1.add('edittext', undefined, '24');
     txtCompFrameRate.characters = 2;
 
-    grpCompRow2.add('statictext', undefined, 'Background Color:');
+    // Section 2
+    var compSection2 = panel.add('panel', undefined, 'Options');  
+    compSection2.alignment = ['fill', 'center'];
+
+    // Color options
+    var grpCompRow2 = compSection2.add('group');
+    grpCompRow2.orientation = 'row';
+
+    grpCompRow2.add('statictext', undefined, 'Background:');
     var txtBgColorHex = grpCompRow2.add('edittext', undefined, '#000000');
     txtBgColorHex.characters = 6;
 
-    // Import options
-    var grpOptions = panel.add('group');
-    grpOptions.orientation = 'row';
-
-    grpOptions.add('statictext', undefined, 'Solid Color:');
-    var txtSolidColorHex = grpOptions.add('edittext', undefined, '#000000');
+    grpCompRow2.add('statictext', undefined, 'Solids:');
+    var txtSolidColorHex = grpCompRow2.add('edittext', undefined, '#000000');
     txtSolidColorHex.characters = 6;
+
+    // Import options
+    var grpOptions = compSection2.add('group');
+    grpOptions.orientation = 'row';
 
     var chkMarkKeyframes = grpOptions.add('checkbox', undefined, 'Mark Keyframes');
     var chkReverseLayerOrder = grpOptions.add('checkbox', undefined, 'Reverse Layer Order');
@@ -304,13 +314,19 @@ function drawPanel(rootPanel) {
         panel.close(); // If running undocked
     }
 
-    panel.add('button', undefined, 'Import EDL...').onClick = runImport;
+    btnRunImport = panel.add('button', undefined, 'Import EDL...');
+    btnRunImport.alignment = ['center', 'center'];
+    btnRunImport.onClick = runImport;
     // runImport(); // Debug only
 
     return panel;
 }
 
 var panel = drawPanel(this);
+
+panel.onResizing = panel.onResize = function() {
+    this.layout.resize();
+};
 
 if (panel instanceof Window) {
     // Running undocked
