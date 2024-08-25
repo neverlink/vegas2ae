@@ -3,7 +3,9 @@
   </br>
   Vegas2AE
 </h1>
-<p align="center">An After Effects ScriptUI panel to import your Vegas Pro projects via EDL files.</p>
+<p align="center">An After Effects ScriptUI panel to import your Vegas Pro projects via EDL files.
+
+<video src="https://github.com/user-attachments/assets/46924dbe-8aaa-46f6-bc27-8cfe6319130e">
 
 ## Features
 - Fade In/Out
